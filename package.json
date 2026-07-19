@@ -1,0 +1,12 @@
+{
+  "name": "rappel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Rappel - AI productivity dashboard (inbox triage, phishing guard, drafts, meeting summaries).",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
