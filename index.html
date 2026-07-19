@@ -1,0 +1,3186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Rappel is the browser extension that anchors to your inbox, calendar, and documents, lowering you through the noise one controlled checkpoint at a time. Descend. Don't forget.">
+  <title>Rappel | Hold the Rope. Recall Everything.</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+  <style>
+    /* ----------------------------------------------------
+       DESIGN SYSTEM & UTILITIES
+       ---------------------------------------------------- */
+    :root {
+      --bg-rock-deep: #0b0d10;
+      --bg-rock-medium: #11151c;
+      --bg-rock-light: #1b212c;
+      
+      --orange-rope: #ff6b35;
+      --orange-hover: #ff8556;
+      --orange-glow: rgba(255, 107, 53, 0.25);
+      
+      --blue-glacier: #06b6d4;
+      --blue-glow: rgba(6, 182, 212, 0.25);
+      
+      --text-chalk: #f4f4f6;
+      --text-muted: #94a3b8;
+      
+      --metal-clip: #334155;
+      --metal-clip-light: #475569;
+      --border-color: rgba(51, 65, 85, 0.5);
+      
+      --font-display: 'Space Grotesk', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      
+      --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+      --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      background-color: var(--bg-rock-deep);
+      color: var(--text-chalk);
+      font-family: var(--font-body);
+      overflow-x: hidden;
+    }
+
+    body {
+      position: relative;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-rock-deep);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--metal-clip);
+      border-radius: 5px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--orange-rope);
+    }
+
+    ::selection {
+      background: var(--orange-rope);
+      color: var(--bg-rock-deep);
+    }
+
+    h1, h2, h3, h4 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    /* ----------------------------------------------------
+       LAYOUT & DECORATION
+       ---------------------------------------------------- */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+      position: relative;
+    }
+
+    /* Background noise/texture simulation */
+    .rock-texture {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      opacity: 0.02;
+      pointer-events: none;
+      z-index: 999;
+      background-image: radial-gradient(var(--text-chalk) 1px, transparent 0),
+                        radial-gradient(var(--text-chalk) 1px, transparent 0);
+      background-size: 8px 8px;
+      background-position: 0 0, 4px 4px;
+    }
+
+    /* Continuous vertical rope line */
+    @media (min-width: 769px) {
+      .continuous-rope {
+        position: absolute;
+        top: 680px; /* Starts below the hero install widget */
+        bottom: 80px; /* Runs all the way to the footer CTA */
+        width: 4px;
+        background: repeating-linear-gradient(
+          to bottom,
+          var(--orange-rope),
+          var(--orange-rope) 12px,
+          var(--bg-rock-deep) 12px,
+          var(--bg-rock-deep) 20px
+        );
+        z-index: 1;
+        left: 74px; /* Matches the center of the timeline container */
+      }
+      
+      @media (min-width: 1248px) {
+        .continuous-rope {
+          left: calc(50% - 600px + 74px);
+        }
+      }
+    }
+
+    /* Sway Animation */
+    @keyframes sway {
+      0% { transform: rotate(0deg); }
+      25% { transform: rotate(1deg); }
+      75% { transform: rotate(-1deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    .card-sway {
+      transform-origin: top center;
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .card-sway:hover {
+        animation: sway 4s ease-in-out infinite;
+      }
+    }
+
+    /* 150-200ms Icon Hover Transitions */
+    svg, .checkpoint-node, .extension-icon-wrap, .chip, .triage-slider-handle, .compressor-center-btn, .drop-package, .cal-badge-alert, .verdict-badge {
+      transition: transform 0.2s var(--ease-spring), 
+                  filter 0.18s var(--ease-smooth), 
+                  box-shadow 0.18s var(--ease-smooth),
+                  background-color 0.18s var(--ease-smooth),
+                  border-color 0.18s var(--ease-smooth);
+    }
+
+    /* SVG Drop Shadow Hover Glow */
+    svg:hover {
+      filter: drop-shadow(0 0 8px var(--orange-rope));
+    }
+
+    /* Checkpoint Node Box Shadow Hover Glow */
+    .checkpoint-node:hover {
+      box-shadow: 0 0 14px var(--orange-rope);
+      border-color: var(--orange-rope) !important;
+    }
+
+    /* Toolbar Trigger Node Hover Glow */
+    .extension-icon-wrap:hover {
+      box-shadow: 0 0 10px var(--orange-rope);
+      border-color: var(--orange-rope) !important;
+    }
+
+    /* Triage Slider Handle Hover Glow */
+    .triage-slider-handle:hover {
+      box-shadow: 0 0 12px var(--orange-rope);
+      background-color: var(--orange-hover);
+    }
+
+    /* Compressor Pulley Button Hover Glow */
+    .compressor-center-btn:hover {
+      box-shadow: 0 0 14px var(--orange-rope);
+      background-color: var(--orange-hover);
+    }
+
+    /* Demo falling envelope Hover Glow */
+    .drop-package:hover {
+      box-shadow: 0 0 12px var(--orange-rope);
+      background-color: var(--orange-hover);
+    }
+
+    /* Toggle chips Hover Glow */
+    .chip:hover {
+      box-shadow: 0 0 10px var(--orange-rope);
+      border-color: var(--orange-rope);
+    }
+
+    /* ----------------------------------------------------
+       NAVIGATION
+       ---------------------------------------------------- */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(11, 13, 16, 0.8);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      transition: all 0.3s var(--ease-smooth);
+    }
+
+    .nav-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      height: 80px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 24px;
+      font-family: var(--font-display);
+      font-weight: 700;
+      color: var(--text-chalk);
+      cursor: pointer;
+    }
+
+    .logo svg {
+      width: 28px;
+      height: 28px;
+      fill: none;
+      stroke: var(--orange-rope);
+      stroke-width: 2.5;
+      transition: transform 0.4s var(--ease-spring);
+    }
+
+    .logo:hover svg {
+      transform: rotate(45deg);
+    }
+
+    nav {
+      display: flex;
+      align-items: center;
+      gap: 36px;
+    }
+
+    .nav-link {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text-muted);
+      position: relative;
+      padding: 6px 0;
+      transition: color 0.2s;
+    }
+
+    .nav-link:hover {
+      color: var(--text-chalk);
+    }
+
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 0;
+      height: 2px;
+      background-color: var(--orange-rope);
+      transition: width 0.3s var(--ease-spring);
+    }
+
+    .nav-link:hover::after {
+      width: 100%;
+    }
+
+    .nav-cta {
+      background-color: transparent;
+      border: 2px solid var(--orange-rope);
+      color: var(--orange-rope);
+      padding: 10px 20px;
+      border-radius: 99px;
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s var(--ease-smooth);
+    }
+
+    .nav-cta:hover {
+      background-color: var(--orange-rope);
+      color: var(--bg-rock-deep);
+      box-shadow: 0 0 15px var(--orange-glow);
+    }
+
+    .menu-toggle {
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      cursor: pointer;
+      background: none;
+      border: none;
+    }
+
+    .menu-toggle span {
+      display: block;
+      width: 24px;
+      height: 2px;
+      background-color: var(--text-chalk);
+    }
+
+    /* ----------------------------------------------------
+       HERO & INSTALLATION WIDGET
+       ---------------------------------------------------- */
+    .hero-section {
+      padding: 60px 0 80px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      position: relative;
+    }
+
+    .hero-tag {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--blue-glacier);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      padding: 4px 12px;
+      border-radius: 99px;
+      margin-bottom: 24px;
+      background: rgba(6, 182, 212, 0.05);
+    }
+
+    .hero-title {
+      font-size: clamp(36px, 6vw, 68px);
+      line-height: 1.05;
+      max-width: 950px;
+      margin-bottom: 24px;
+      text-transform: uppercase;
+    }
+
+    .hero-title span.highlight {
+      color: var(--orange-rope);
+      position: relative;
+      display: inline-block;
+    }
+
+    .hero-subtitle {
+      font-size: clamp(16px, 2vw, 20px);
+      color: var(--text-muted);
+      max-width: 700px;
+      margin-bottom: 48px;
+      line-height: 1.6;
+    }
+
+    .widget-container {
+      width: 100%;
+      max-width: 680px;
+      min-height: 280px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      perspective: 1000px;
+      margin-bottom: 40px;
+    }
+
+    .clip-btn {
+      background: linear-gradient(135deg, var(--orange-rope), #e0531f);
+      color: var(--text-chalk);
+      border: none;
+      padding: 22px 48px;
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 700;
+      border-radius: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 0 10px 30px rgba(255, 107, 53, 0.3),
+                  inset 0 2px 0 rgba(255, 255, 255, 0.2);
+      transition: all 0.3s var(--ease-spring);
+      position: relative;
+      z-index: 5;
+    }
+
+    .clip-btn:hover {
+      transform: translateY(-4px) scale(1.02);
+      box-shadow: 0 15px 35px rgba(255, 107, 53, 0.45),
+                  inset 0 2px 0 rgba(255, 255, 255, 0.3);
+    }
+
+    .clip-btn:active {
+      transform: translateY(2px) scale(0.98);
+    }
+
+    .clip-btn svg {
+      width: 26px;
+      height: 26px;
+      stroke: var(--text-chalk);
+      stroke-width: 2.5;
+      fill: none;
+      transition: transform 0.5s var(--ease-spring);
+    }
+
+    .clip-btn:hover svg {
+      transform: rotate(-15deg);
+    }
+
+    .simulation-panel {
+      position: absolute;
+      width: 100%;
+      background-color: var(--bg-rock-medium);
+      border: 2px solid var(--metal-clip);
+      border-radius: 20px;
+      padding: 30px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(0.9) translateY(20px);
+      transition: all 0.4s var(--ease-spring);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    .simulation-panel.active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: scale(1) translateY(0);
+    }
+
+    .anchor-graphic {
+      width: 100px;
+      height: 100px;
+      position: relative;
+    }
+
+    .anchor-carabiner {
+      width: 100%;
+      height: 100%;
+      stroke: var(--text-muted);
+      stroke-width: 4;
+      fill: none;
+      transition: all 0.3s;
+    }
+
+    .carabiner-gate {
+      transform-origin: 75px 25px;
+      transition: transform 0.4s var(--ease-spring);
+    }
+
+    .anchor-rope {
+      position: absolute;
+      top: 50px;
+      left: 50%;
+      width: 8px;
+      height: 0;
+      background: var(--orange-rope);
+      transform: translateX(-50%);
+      transition: height 0.5s var(--ease-spring);
+      border-radius: 4px;
+    }
+
+    .simulation-panel.snapped .anchor-carabiner {
+      stroke: var(--orange-rope);
+      filter: drop-shadow(0 0 8px var(--orange-glow));
+    }
+
+    .simulation-panel.snapped .carabiner-gate {
+      transform: rotate(-40deg);
+    }
+
+    .simulation-panel.snapped .anchor-rope {
+      height: 60px;
+    }
+
+    .status-terminal {
+      width: 100%;
+      max-width: 400px;
+      background-color: var(--bg-rock-deep);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 16px;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      text-align: left;
+      height: 100px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    .status-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      opacity: 0.3;
+      transition: all 0.3s var(--ease-smooth);
+    }
+
+    .status-line.active {
+      opacity: 1;
+      color: var(--orange-rope);
+    }
+
+    .status-line.completed {
+      opacity: 1;
+      color: var(--blue-glacier);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--text-muted);
+    }
+
+    .status-line.active .status-dot {
+      background-color: var(--orange-rope);
+      box-shadow: 0 0 8px var(--orange-rope);
+      animation: pulse 1s infinite alternate;
+    }
+
+    .status-line.completed .status-dot {
+      background-color: var(--blue-glacier);
+    }
+
+    @keyframes pulse {
+      from { transform: scale(0.8); opacity: 0.5; }
+      to { transform: scale(1.2); opacity: 1; }
+    }
+
+    .mock-browser-toolbar {
+      position: absolute;
+      width: 100%;
+      background: var(--bg-rock-medium);
+      border: 2px solid var(--blue-glacier);
+      border-radius: 16px;
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(0.8) rotateX(15deg);
+      transition: all 0.5s var(--ease-spring);
+      box-shadow: 0 25px 50px rgba(6, 182, 212, 0.15), 0 10px 20px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .mock-browser-toolbar.active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: scale(1) rotateX(0deg);
+    }
+
+    .browser-header {
+      background: var(--bg-rock-deep);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      padding: 10px 16px;
+      gap: 12px;
+    }
+
+    .browser-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .browser-dots span {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: var(--metal-clip);
+    }
+
+    .browser-dots span:nth-child(1) { background-color: #ef4444; }
+    .browser-dots span:nth-child(2) { background-color: #f59e0b; }
+    .browser-dots span:nth-child(3) { background-color: #10b981; }
+
+    .browser-address {
+      flex-grow: 1;
+      background: rgba(11, 13, 16, 0.6);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .browser-address svg {
+      width: 12px;
+      height: 12px;
+      stroke: var(--text-muted);
+    }
+
+    .browser-extensions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .extension-icon-wrap {
+      position: relative;
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      background: rgba(6, 182, 212, 0.1);
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .extension-icon-wrap svg {
+      width: 18px;
+      height: 18px;
+      stroke: var(--blue-glacier);
+      stroke-width: 2.5;
+      fill: none;
+    }
+
+    .badge {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      background: var(--orange-rope);
+      color: var(--bg-rock-deep);
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 9px;
+      min-width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 8px var(--orange-glow);
+    }
+
+    .mock-dashboard {
+      padding: 20px;
+      text-align: left;
+      background-color: var(--bg-rock-medium);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .dashboard-status {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 12px;
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .status-indicator-dot {
+      width: 10px;
+      height: 10px;
+      background-color: var(--blue-glacier);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--blue-glacier);
+    }
+
+    .dashboard-meta {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .notification-alert {
+      background: rgba(255, 107, 53, 0.08);
+      border: 1px solid rgba(255, 107, 53, 0.2);
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .notification-alert svg {
+      stroke: var(--orange-rope);
+      flex-shrink: 0;
+    }
+
+    .notification-text {
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .notification-text strong {
+      color: var(--orange-rope);
+    }
+
+    .mock-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 6px;
+    }
+
+    .mock-btn {
+      flex: 1;
+      padding: 10px;
+      border-radius: 8px;
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 13px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .mock-btn-primary {
+      background: var(--orange-rope);
+      color: var(--bg-rock-deep);
+      border: none;
+    }
+
+    .mock-btn-primary:hover {
+      background-color: var(--orange-hover);
+    }
+
+    .mock-btn-secondary {
+      background: transparent;
+      border: 1px solid var(--metal-clip);
+      color: var(--text-chalk);
+    }
+
+    .mock-btn-secondary:hover {
+      background: var(--metal-clip);
+    }
+
+    /* ----------------------------------------------------
+       THE DICTIONARY (DOUBLE MEANING WIDGET)
+       ---------------------------------------------------- */
+    .dictionary-section {
+      padding: 40px 0;
+    }
+
+    .dictionary-card {
+      background: var(--bg-rock-medium);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 36px;
+      max-width: 650px;
+      margin: 0 auto;
+      position: relative;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+      z-index: 2;
+    }
+
+    .dict-word-wrap {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+    }
+
+    .dict-word {
+      font-size: 38px;
+      font-family: var(--font-display);
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--text-chalk);
+    }
+
+    .dict-phonetic {
+      font-family: var(--font-mono);
+      font-size: 16px;
+      color: var(--text-muted);
+    }
+
+    .dict-pos {
+      font-style: italic;
+      color: var(--orange-rope);
+      font-size: 15px;
+    }
+
+    .dict-def {
+      position: relative;
+      font-size: 16px;
+      line-height: 1.6;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+      padding: 16px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid transparent;
+      transition: all 0.3s var(--ease-smooth);
+      cursor: pointer;
+      z-index: 2;
+    }
+
+    .dict-def:last-child {
+      margin-bottom: 0;
+    }
+
+    .def-num {
+      font-weight: 700;
+      color: var(--orange-rope);
+      margin-right: 8px;
+    }
+
+    .dict-def:hover {
+      color: var(--text-chalk);
+      border-color: var(--border-color);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .dict-def#def-climbing:hover {
+      box-shadow: 0 0 20px rgba(255, 107, 53, 0.08);
+      border-color: rgba(255, 107, 53, 0.3);
+    }
+
+    .dict-def#def-memory:hover {
+      box-shadow: 0 0 20px rgba(6, 182, 212, 0.08);
+      border-color: rgba(6, 182, 212, 0.3);
+    }
+
+    .flourish-rope {
+      position: absolute;
+      right: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      opacity: 0;
+      width: 60px;
+      height: 30px;
+      transition: all 0.3s var(--ease-spring);
+      pointer-events: none;
+    }
+
+    .flourish-rope svg {
+      width: 100%;
+      height: 100%;
+      fill: none;
+      stroke: var(--orange-rope);
+      stroke-width: 2.5;
+    }
+
+    .dict-def#def-climbing:hover .flourish-rope {
+      opacity: 1;
+      right: 30px;
+    }
+
+    .flourish-memory {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border-radius: 10px;
+      pointer-events: none;
+      z-index: -1;
+      opacity: 0;
+      transition: opacity 0.3s;
+      background: radial-gradient(circle at center, rgba(6, 182, 212, 0.15) 0%, transparent 70%);
+    }
+
+    .dict-def#def-memory:hover .flourish-memory {
+      opacity: 1;
+      animation: pulseGlow 1.5s infinite alternate;
+    }
+
+    @keyframes pulseGlow {
+      0% { transform: scale(0.95); opacity: 0.5; }
+      100% { transform: scale(1.05); opacity: 1; }
+    }
+
+    /* ----------------------------------------------------
+       THE DESCENT: SCROLL-DRIVEN TIMELINE
+       ---------------------------------------------------- */
+    .descent-section {
+      padding: 100px 0;
+      position: relative;
+    }
+
+    .section-title-wrap {
+      text-align: center;
+      margin-bottom: 80px;
+      z-index: 2;
+    }
+
+    .section-title {
+      font-size: clamp(28px, 4vw, 42px);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .section-subtitle {
+      color: var(--text-muted);
+      max-width: 550px;
+      margin: 0 auto;
+      font-size: clamp(14px, 1.5vw, 16px);
+      line-height: 1.6;
+    }
+
+    .descent-layout {
+      display: grid;
+      grid-template-columns: 100px 1fr;
+      gap: 20px;
+      position: relative;
+      min-height: 1800px;
+    }
+
+    .rope-track-container {
+      position: relative;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      z-index: 2;
+    }
+
+    .rope-track-sticky {
+      position: sticky;
+      top: 150px;
+      height: 500px;
+      width: 4px;
+      display: flex;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .rope-climber {
+      position: absolute;
+      top: 0;
+      width: 40px;
+      height: 40px;
+      transform: translateY(-50%);
+      transition: top 0.4s var(--ease-spring);
+      z-index: 12;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .rope-climber svg {
+      width: 32px;
+      height: 32px;
+      fill: none;
+      stroke: var(--orange-rope);
+      stroke-width: 3;
+      filter: drop-shadow(0 0 8px var(--orange-rope));
+      animation: climber-dangle 2s ease-in-out infinite alternate;
+    }
+
+    @keyframes climber-dangle {
+      0% { transform: rotate(-5deg) translateY(-2px); }
+      100% { transform: rotate(5deg) translateY(2px); }
+    }
+
+    .checkpoint-list {
+      display: flex;
+      flex-direction: column;
+      gap: 120px;
+      padding-bottom: 200px;
+      z-index: 2;
+    }
+
+    .checkpoint-card {
+      background: var(--bg-rock-medium);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 30px;
+      position: relative;
+      opacity: 0.3;
+      transform: scale(0.96);
+      transition: all 0.5s var(--ease-smooth);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .checkpoint-card.active {
+      opacity: 1;
+      transform: scale(1);
+      border-color: var(--orange-rope);
+      box-shadow: 0 15px 30px rgba(255, 107, 53, 0.08);
+    }
+
+    .checkpoint-card.active::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, var(--orange-rope), var(--blue-glacier));
+      z-index: -1;
+      opacity: 0.15;
+      animation: border-glow 3s infinite alternate;
+    }
+
+    .card-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .card-cp-tag {
+      color: var(--orange-rope);
+      background: rgba(255, 107, 53, 0.1);
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .card-altitude {
+      color: var(--text-muted);
+    }
+
+    .card-title {
+      font-size: clamp(20px, 3vw, 24px);
+      margin-bottom: 12px;
+      color: var(--text-chalk);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .lock-indicator {
+      width: 24px;
+      height: 24px;
+      stroke: var(--text-muted);
+      stroke-width: 2;
+      fill: none;
+      transition: all 0.3s;
+    }
+
+    .checkpoint-card.active .lock-indicator {
+      stroke: var(--blue-glacier);
+      transform: rotate(360deg);
+    }
+
+    .card-desc {
+      color: var(--text-muted);
+      line-height: 1.6;
+      font-size: 15px;
+      margin-bottom: 24px;
+    }
+
+    /* Checkpoint Markers (Nodes) on Timeline - Aligned exactly with card-meta baseline */
+    .checkpoint-node {
+      position: absolute;
+      left: -72px; /* Center-aligned with the background continuous rope track */
+      top: 36px;   /* Center-aligned with vertical height of card label line */
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background-color: var(--bg-rock-deep);
+      border: 3px solid var(--metal-clip);
+      z-index: 11;
+      transition: all 0.2s var(--ease-smooth);
+    }
+
+    .checkpoint-card.active .checkpoint-node {
+      border-color: var(--orange-rope);
+      background-color: var(--orange-rope);
+      box-shadow: 0 0 10px var(--orange-rope);
+    }
+
+    /* ----------------------------------------------------
+       CHECKPOINT INTERACTIVE INTERNAL CONTAINERS
+       ---------------------------------------------------- */
+    .checkpoint-interactive-stage {
+      background: var(--bg-rock-deep);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 16px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* CP 1: Inbox Triage Slider */
+    .triage-slider-container {
+      position: relative;
+      height: 200px;
+      overflow: hidden;
+      border-radius: 8px;
+      user-select: none;
+    }
+
+    .slider-pane {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      justify-content: center;
+      padding: 0 16px;
+    }
+
+    .slider-pane.pane-before {
+      background-color: #12151b;
+      z-index: 1;
+    }
+
+    .slider-pane.pane-after {
+      background-color: #1a202c;
+      z-index: 2;
+      clip-path: inset(0 0 0 50%);
+    }
+
+    .email-item-mini {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(51, 65, 85, 0.3);
+      font-size: 13px;
+    }
+
+    .pane-after .email-item-mini {
+      border-left-width: 4px;
+    }
+    .pane-after .urgent-item { border-left-color: #ef4444; }
+    .pane-after .sketchy-item { border-left-color: #f59e0b; }
+    .pane-after .safe-item { border-left-color: #10b981; }
+
+    .mini-badge {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 3px;
+      text-transform: uppercase;
+    }
+
+    .mini-badge.urgent { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+    .mini-badge.sketchy { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+    .mini-badge.safe { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+
+    .triage-slider-control {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 4px;
+      background-color: var(--orange-rope);
+      z-index: 3;
+      transform: translateX(-50%);
+      pointer-events: none;
+    }
+
+    .triage-slider-handle {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background-color: var(--orange-rope);
+      border: 2px solid var(--text-chalk);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 4;
+      cursor: ew-resize;
+      box-shadow: 0 0 10px var(--orange-glow);
+    }
+
+    .triage-slider-handle svg {
+      width: 16px;
+      height: 16px;
+      stroke: var(--text-chalk);
+      fill: none;
+    }
+
+    .triage-range-input {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: ew-resize;
+      z-index: 5;
+    }
+
+    /* CP 2: Phishing Hotspots */
+    .phish-game-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .phish-mail-header {
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 10px;
+      margin-bottom: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .phish-line {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .phish-line strong {
+      color: var(--text-chalk);
+    }
+
+    .phish-body {
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
+
+    .hotspot {
+      background: rgba(239, 68, 68, 0.1);
+      border-bottom: 1px dashed #ef4444;
+      cursor: help;
+      position: relative;
+      color: var(--text-chalk);
+      padding: 0 4px;
+      border-radius: 3px;
+      transition: all 0.2s;
+    }
+
+    .hotspot:hover {
+      background: rgba(239, 68, 68, 0.25);
+    }
+
+    .hotspot-tooltip {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%) translateY(10px);
+      width: 240px;
+      background-color: var(--bg-rock-light);
+      border: 1px solid #ef4444;
+      color: var(--text-chalk);
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s var(--ease-spring);
+      z-index: 10;
+      line-height: 1.4;
+    }
+
+    .hotspot-tooltip::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 6px solid transparent;
+      border-top-color: #ef4444;
+    }
+
+    .hotspot:hover .hotspot-tooltip {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* CP 3: Typing Autocomplete */
+    .compose-stage {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .compose-subject {
+      font-size: 13px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 8px;
+    }
+
+    .compose-textarea-sim {
+      font-family: var(--font-body);
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--text-chalk);
+      min-height: 80px;
+      white-space: pre-wrap;
+    }
+
+    .cursor-caret {
+      display: inline-block;
+      width: 2px;
+      height: 16px;
+      background-color: var(--blue-glacier);
+      margin-left: 2px;
+      animation: blink 0.8s infinite;
+    }
+
+    @keyframes blink {
+      50% { opacity: 0; }
+    }
+
+    .compose-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .draft-meta {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--blue-glacier);
+      opacity: 0;
+      transform: scale(0.9);
+      transition: all 0.3s var(--ease-spring);
+    }
+
+    .draft-meta.show {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .replay-draft-btn {
+      background: var(--metal-clip);
+      border: none;
+      color: var(--text-chalk);
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .replay-draft-btn:hover {
+      background: var(--metal-clip-light);
+    }
+
+    /* CP 4: Notes Compressor */
+    .compressor-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      align-items: center;
+      position: relative;
+    }
+
+    .raw-notes-pane {
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 12px;
+      color: var(--text-muted);
+      height: 140px;
+      overflow-y: auto;
+      transition: all 0.5s var(--ease-smooth);
+    }
+
+    .compressor-center-btn {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background-color: var(--orange-rope);
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+      z-index: 5;
+      transition: transform 0.2s;
+    }
+
+    .compressor-center-btn:hover {
+      transform: translate(-50%, -50%) scale(1.1);
+    }
+
+    .compressor-center-btn svg {
+      width: 18px;
+      height: 18px;
+      stroke: var(--text-chalk);
+      fill: none;
+      transition: transform 0.4s var(--ease-spring);
+    }
+
+    .summary-pane {
+      background: rgba(6, 182, 212, 0.02);
+      border: 1px dashed rgba(6, 182, 212, 0.2);
+      border-radius: 8px;
+      padding: 12px;
+      height: 140px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      justify-content: center;
+      transition: all 0.5s var(--ease-smooth);
+    }
+
+    .summary-item-card {
+      font-size: 12px;
+      background: var(--bg-rock-light);
+      border: 1px solid var(--border-color);
+      padding: 8px 12px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      opacity: 0;
+      transform: translateX(10px);
+      transition: all 0.4s var(--ease-spring);
+    }
+
+    .raw-notes-pane.compressed {
+      transform: scale(0.6);
+      opacity: 0.1;
+      pointer-events: none;
+    }
+
+    .summary-pane.active {
+      background: rgba(6, 182, 212, 0.05);
+      border: 1px solid var(--blue-glacier);
+      box-shadow: 0 0 15px rgba(6, 182, 212, 0.1);
+    }
+
+    .summary-pane.active .summary-item-card {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .summary-pane.active .summary-item-card:nth-child(1) { transition-delay: 0.1s; }
+    .summary-pane.active .summary-item-card:nth-child(2) { transition-delay: 0.25s; }
+    .summary-pane.active .summary-item-card:nth-child(3) { transition-delay: 0.4s; }
+
+    /* CP 5: Calendar Brief Flip Card */
+    .cp5-wrapper {
+      max-width: 450px;
+      margin: 0 auto;
+    }
+
+    .calendar-flip-card {
+      background-color: transparent;
+      height: 220px;
+      perspective: 1000px;
+      cursor: pointer;
+    }
+
+    .flip-card-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      text-align: center;
+      transition: transform 0.6s var(--ease-spring);
+      transform-style: preserve-3d;
+    }
+
+    .calendar-flip-card:hover .flip-card-inner {
+      transform: rotateY(180deg);
+    }
+
+    .flip-card-front, .flip-card-back {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      -webkit-backface-visibility: hidden;
+      backface-visibility: hidden;
+      border-radius: 12px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      text-align: left;
+    }
+
+    .flip-card-front {
+      background: var(--bg-rock-deep);
+      border: 1px solid var(--blue-glacier);
+      box-shadow: 0 5px 15px rgba(6, 182, 212, 0.15);
+    }
+
+    .flip-card-back {
+      background: linear-gradient(135deg, var(--orange-rope) 0%, #e0531f 100%);
+      color: var(--text-chalk);
+      transform: rotateY(180deg);
+      box-shadow: 0 10px 25px rgba(255, 107, 53, 0.25);
+    }
+
+    .cal-title {
+      font-size: 18px;
+      font-family: var(--font-display);
+      font-weight: 700;
+    }
+
+    .cal-meta-line {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 8px;
+    }
+
+    .cal-badge-alert {
+      align-self: flex-start;
+      background: rgba(6, 182, 212, 0.15);
+      border: 1px solid var(--blue-glacier);
+      color: var(--blue-glacier);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .flip-instruction {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      text-align: right;
+    }
+
+    .brief-sticky-title {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      padding-bottom: 8px;
+      margin-bottom: 8px;
+    }
+
+    .brief-sticky-content {
+      font-size: 13px;
+      line-height: 1.5;
+      font-weight: 500;
+    }
+
+    .brief-sticky-footer {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      opacity: 0.8;
+      text-align: right;
+    }
+
+    /* ----------------------------------------------------
+       LIVE MINI-DEMO: TRY A DROP
+       ---------------------------------------------------- */
+    .demo-section {
+      padding: 100px 0;
+      background: linear-gradient(180deg, var(--bg-rock-deep) 0%, var(--bg-rock-medium) 100%);
+      border-top: 1px solid var(--border-color);
+      border-bottom: 1px solid var(--border-color);
+      z-index: 2;
+    }
+
+    .demo-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+      align-items: center;
+      margin-top: 48px;
+    }
+
+    .demo-info {
+      text-align: left;
+    }
+
+    .demo-info h3 {
+      font-size: clamp(24px, 4vw, 36px);
+      text-transform: uppercase;
+      margin-bottom: 18px;
+    }
+
+    .demo-info p {
+      color: var(--text-muted);
+      line-height: 1.6;
+      font-size: 16px;
+      margin-bottom: 24px;
+    }
+
+    .demo-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .chip {
+      background: var(--bg-rock-light);
+      border: 1px solid var(--metal-clip);
+      color: var(--text-muted);
+      padding: 10px 20px;
+      border-radius: 99px;
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s var(--ease-smooth);
+    }
+
+    .chip:hover {
+      border-color: var(--text-muted);
+      color: var(--text-chalk);
+    }
+
+    .chip.active {
+      border-color: var(--orange-rope);
+      color: var(--orange-rope);
+      background: rgba(255, 107, 53, 0.05);
+      box-shadow: 0 0 12px var(--orange-glow);
+    }
+
+    .demo-card {
+      background: var(--bg-rock-light);
+      border: 1px solid var(--metal-clip);
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .textarea-label {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .demo-textarea {
+      background: var(--bg-rock-deep);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 16px;
+      color: var(--text-chalk);
+      font-family: var(--font-body);
+      font-size: 14px;
+      line-height: 1.5;
+      resize: none;
+      height: 120px;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .demo-textarea:focus {
+      border-color: var(--orange-rope);
+    }
+
+    .drop-simulation-stage {
+      height: 80px;
+      border: 1px dashed var(--border-color);
+      border-radius: 10px;
+      background: rgba(11, 13, 16, 0.5);
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    .stage-wire {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: repeating-linear-gradient(
+        to bottom,
+        var(--metal-clip),
+        var(--metal-clip) 4px,
+        transparent 4px,
+        transparent 8px
+      );
+    }
+
+    .drop-package {
+      position: absolute;
+      top: 6px;
+      width: 32px;
+      height: 32px;
+      background: var(--metal-clip-light);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 5;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      transform: translateY(0);
+    }
+
+    .drop-package svg {
+      width: 18px;
+      height: 18px;
+      stroke: var(--text-chalk);
+      fill: none;
+    }
+
+    @keyframes dropIt {
+      0% { top: 6px; transform: scaleY(1.1); }
+      70% { top: 40px; transform: scaleY(0.9); }
+      85% { top: 44px; transform: scaleY(1); }
+      100% { top: 40px; }
+    }
+
+    .drop-package.falling {
+      animation: dropIt 0.7s var(--ease-spring) forwards;
+      background: var(--orange-rope);
+      box-shadow: 0 0 12px var(--orange-glow);
+    }
+
+    .scanline {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--blue-glacier);
+      box-shadow: 0 0 10px var(--blue-glacier);
+      opacity: 0;
+      z-index: 6;
+    }
+
+    @keyframes scan {
+      0% { top: 0; opacity: 1; }
+      100% { top: 100%; opacity: 1; }
+    }
+
+    .scanline.scanning {
+      animation: scan 1.2s linear;
+    }
+
+    .drop-btn {
+      background: var(--text-chalk);
+      color: var(--bg-rock-deep);
+      border: none;
+      padding: 14px 28px;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 15px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: all 0.2s var(--ease-smooth);
+    }
+
+    .drop-btn:hover {
+      background: var(--orange-rope);
+      color: var(--text-chalk);
+      box-shadow: 0 4px 15px var(--orange-glow);
+    }
+
+    .result-panel {
+      border: 1px solid var(--border-color);
+      background: var(--bg-rock-deep);
+      border-radius: 10px;
+      padding: 20px;
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      animation: fadeInUp 0.4s var(--ease-spring);
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 10px;
+    }
+
+    .verdict-badge {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .verdict-badge.normal {
+      background: rgba(16, 185, 129, 0.1);
+      color: #10b981;
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .verdict-badge.urgent {
+      background: rgba(239, 68, 68, 0.1);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    .verdict-badge.sketchy {
+      background: rgba(245, 158, 11, 0.1);
+      color: #f59e0b;
+      border: 1px solid rgba(245, 158, 11, 0.2);
+    }
+
+    .verdict-confidence {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .verdict-text {
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .verdict-draft {
+      margin-top: 6px;
+      background: var(--bg-rock-medium);
+      border-left: 3px solid var(--blue-glacier);
+      padding: 10px 14px;
+      border-radius: 0 6px 6px 0;
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* ----------------------------------------------------
+       COMPARISON SECTION: VS THE FREE-FALL
+       ---------------------------------------------------- */
+    .compare-section {
+      padding: 100px 0;
+      text-align: center;
+      z-index: 2;
+    }
+
+    .compare-table {
+      margin-top: 48px;
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      background: var(--bg-rock-medium);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    .compare-table th, .compare-table td {
+      padding: 24px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .compare-table th {
+      background-color: var(--bg-rock-light);
+      font-family: var(--font-display);
+      font-size: 16px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .compare-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .compare-feature {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 16px;
+      color: var(--text-chalk);
+      width: 25%;
+    }
+
+    .compare-freefall {
+      color: var(--text-muted);
+      width: 37.5%;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .compare-rappel {
+      color: var(--text-chalk);
+      width: 37.5%;
+      font-size: 14px;
+      line-height: 1.5;
+      background: rgba(255, 107, 53, 0.02);
+      border-left: 1px solid var(--border-color);
+    }
+
+    .compare-rappel strong {
+      color: var(--orange-rope);
+    }
+
+    .comparison-highlight {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .comparison-highlight svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .icon-fail { stroke: #ef4444; }
+    .icon-pass { stroke: var(--blue-glacier); }
+
+    /* ----------------------------------------------------
+       FOOTER CTA & FOOTER
+       ---------------------------------------------------- */
+    .footer-cta-section {
+      padding: 100px 0;
+      background: radial-gradient(circle at center, rgba(255, 107, 53, 0.05) 0%, transparent 70%);
+      text-align: center;
+      border-top: 1px solid var(--border-color);
+      z-index: 2;
+    }
+
+    .footer-cta-title {
+      font-size: clamp(32px, 5vw, 54px);
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .footer-cta-subtitle {
+      color: var(--text-muted);
+      max-width: 500px;
+      margin: 0 auto 36px;
+      font-size: 16px;
+    }
+
+    .footer-cta-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .footer-toast {
+      background: var(--bg-rock-medium);
+      border: 1px solid var(--blue-glacier);
+      padding: 12px 24px;
+      border-radius: 99px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--blue-glacier);
+      display: none;
+      align-items: center;
+      gap: 10px;
+      animation: fadeInUp 0.3s var(--ease-spring);
+    }
+
+    footer {
+      border-top: 1px solid var(--border-color);
+      background-color: var(--bg-rock-deep);
+      padding: 48px 0;
+      font-size: 14px;
+      color: var(--text-muted);
+      z-index: 2;
+    }
+
+    .footer-layout {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 24px;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 24px;
+    }
+
+    .footer-link {
+      transition: color 0.2s;
+    }
+
+    .footer-link:hover {
+      color: var(--text-chalk);
+    }
+
+    .footer-tagline {
+      font-family: var(--font-display);
+      font-size: 13px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    /* ----------------------------------------------------
+       RESPONSIVE & ADAPTIVE STYLES
+       ---------------------------------------------------- */
+    @media (max-width: 900px) {
+      .demo-grid {
+        grid-template-columns: 1fr;
+        gap: 36px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .nav-links-wrap {
+        display: none;
+      }
+      
+      .menu-toggle {
+        display: flex;
+      }
+
+      .descent-layout {
+        grid-template-columns: 1fr;
+        gap: 40px;
+        min-height: auto;
+      }
+
+      .rope-track-container {
+        display: none;
+      }
+
+      .checkpoint-list {
+        gap: 40px;
+        padding-bottom: 0;
+      }
+
+      .checkpoint-card {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      .checkpoint-node {
+        display: none;
+      }
+
+      .compressor-grid {
+        grid-template-columns: 1fr;
+        gap: 40px;
+      }
+
+      .compressor-center-btn {
+        top: auto;
+        bottom: -25px;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+
+      .compressor-center-btn:hover {
+        transform: translateX(-50%) scale(1.1);
+      }
+
+      .compare-table {
+        display: block;
+        overflow-x: auto;
+      }
+
+      .footer-layout {
+        flex-direction: column;
+        text-align: center;
+      }
+
+      .footer-links {
+        justify-content: center;
+      }
+    }
+
+    /* Accessibility preferences */
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+      
+      .checkpoint-card {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      .rope-climber {
+        transition: none;
+      }
+
+      .rope-climber svg {
+        animation: none;
+      }
+
+      .clip-btn, .drop-btn, .chip, .logo svg {
+        transition: none;
+      }
+
+      .clip-btn:hover, .logo:hover svg {
+        transform: none;
+      }
+
+      .drop-package.falling {
+        animation: none;
+        top: 40px;
+      }
+
+      .scanline.scanning {
+        animation: none;
+      }
+
+      .card-sway:hover {
+        animation: none;
+      }
+
+      .flip-card-inner {
+        transition: none;
+      }
+    }
+    
+    /* Global Mode Toggle */
+    .mode-toggle-container {
+      display: flex;
+      justify-content: center;
+      background: var(--bg-rock-medium);
+      border: 1px solid var(--border-color);
+      padding: 6px;
+      border-radius: 99px;
+      width: fit-content;
+      margin: 0 auto 30px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      position: relative;
+      z-index: 10;
+    }
+    .mode-toggle-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 8px 24px;
+      border-radius: 99px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s var(--ease-smooth);
+    }
+    .mode-toggle-btn:hover {
+      color: var(--text-chalk);
+    }
+    .mode-toggle-btn.active {
+      background: var(--orange-rope);
+      color: var(--bg-rock-deep);
+      box-shadow: 0 0 10px var(--orange-glow);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Texture overlay for rocky feel -->
+  <div class="rock-texture"></div>
+
+  <!-- Continuous background rope (aligned with grid first column) -->
+  <div class="continuous-rope"></div>
+
+  <!-- Header Navigation -->
+  <header>
+    <div class="container nav-container">
+      <div class="logo" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
+        <svg viewBox="0 0 24 24">
+          <path d="M7 3h10a5 5 0 0 1 5 5v8a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V8a5 5 0 0 1 5-5z" stroke-linecap="round" />
+          <line x1="17" y1="8" x2="17" y2="16" stroke-dasharray="3,3" />
+        </svg>
+        <span>RAPPEL</span>
+      </div>
+
+      <nav class="nav-links-wrap">
+        <a href="#features" class="nav-link">Safety Anchors</a>
+        <a href="#tryit" class="nav-link">Triage Demo</a>
+        <a href="#compare" class="nav-link">Rappel vs Freefall</a>
+        <button class="nav-cta" onclick="clickClipInButton()">Clip in</button>
+      </nav>
+
+      <button class="menu-toggle" aria-label="Toggle menu" onclick="alert('Rappel is single-page. Links scroll down directly.')">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero-section container">
+    <!-- Global Mode Toggle -->
+    <div class="mode-toggle-container">
+      <button class="mode-toggle-btn active" id="main-mode-work-btn" onclick="switchMainMode('work')">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle; margin-right:4px;"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+        Work Descent
+      </button>
+      <button class="mode-toggle-btn" id="main-mode-campus-btn" onclick="switchMainMode('campus')">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle; margin-right:4px;"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"/></svg>
+        Campus Ascent
+      </button>
+    </div>
+
+    <div class="hero-tag" id="main-hero-tag">ALTITUDE: 5,000FT</div>
+    <h1 class="hero-title" id="main-hero-title">Stop free-falling through your workday.</h1>
+    <p class="hero-subtitle" id="main-hero-subtitle">
+      Rappel anchors to your inbox and holds the rope so you don't have to hold it all in your head.
+    </p>
+
+    <!-- Simulated Installation Widget -->
+    <div class="widget-container" id="install-widget">
+      <!-- State 1: Ready to Clip In Button -->
+      <button class="clip-btn" id="cta-clip-btn">
+        <svg viewBox="0 0 24 24">
+          <path d="M8 3h8a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4z" />
+          <path d="M16 7l-4 4-4-4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Clip in
+      </button>
+
+      <!-- State 2: Simulated Installing Sequence -->
+      <div class="simulation-panel" id="install-simulation">
+        <div class="anchor-graphic">
+          <svg class="anchor-carabiner" viewBox="0 0 100 100">
+            <path d="M30 10h40c15 0 20 10 20 25v30c0 15-5 25-20 25H30C15 90 10 80 10 65v-30C10 20 15 10 30 10z"/>
+            <line class="carabiner-gate" x1="80" y1="25" x2="80" y2="75" stroke="#94a3b8" stroke-width="6" stroke-linecap="round" />
+          </svg>
+          <div class="anchor-rope"></div>
+        </div>
+
+        <div class="status-terminal">
+          <div class="status-line" id="status-step-1">
+            <span class="status-dot"></span>
+            <span>Securing the anchor...</span>
+          </div>
+          <div class="status-line" id="status-step-2">
+            <span class="status-dot"></span>
+            <span>Checking the rope...</span>
+          </div>
+          <div class="status-line" id="status-step-3">
+            <span class="status-dot"></span>
+            <span>You're clipped in.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- State 3: Mock Browser Toolbar -->
+      <div class="mock-browser-toolbar" id="install-success">
+        <div class="browser-header">
+          <div class="browser-dots">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <div class="browser-address">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <span>chrome-extension://rappel/dashboard</span>
+          </div>
+          <div class="browser-extensions">
+            <div class="extension-icon-wrap" id="extension-dropdown-trigger">
+              <svg viewBox="0 0 24 24">
+                <path d="M7 3h10a5 5 0 0 1 5 5v8a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V8a5 5 0 0 1 5-5z" />
+                <line x1="17" y1="8" x2="17" y2="16" stroke-dasharray="2,2" />
+              </svg>
+              <span class="badge">3</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mock-dashboard">
+          <div class="dashboard-status">
+            <div class="status-indicator">
+              <span class="status-indicator-dot"></span>
+              <span>Rappel Extension Active</span>
+            </div>
+            <span class="dashboard-meta">SECURE DROP</span>
+          </div>
+          
+          <div class="notification-alert">
+            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div class="notification-text">
+              <strong>Triage Complete:</strong> Scanned inbox. Found <strong>2 critical tasks</strong> and isolated <strong>1 phishing attempt</strong>.
+            </div>
+          </div>
+
+          <div class="mock-actions">
+            <button class="mock-btn mock-btn-primary" onclick="location.href='#tryit'">Try Triage Demo</button>
+            <button class="mock-btn mock-btn-secondary" onclick="resetInstallSimulation()">Uninstall Simulation</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Dictionary (Double Meaning Card) -->
+  <section class="dictionary-section container">
+    <div class="dictionary-card card-sway">
+      <div class="dict-word-wrap">
+        <span class="dict-word">rappel</span>
+        <span class="dict-phonetic">/ ʁa.pɛl /</span>
+        <span class="dict-pos">noun</span>
+      </div>
+
+      <!-- Definition 1 (Climbing Metaphor) -->
+      <div class="dict-def" id="def-climbing">
+        <span class="def-num">1.</span>
+        <span>A controlled descent down a steep rock face by sliding down a anchored rope system.</span>
+        <span class="flourish-rope">
+          <svg viewBox="0 0 100 20">
+            <path d="M 5,10 Q 30,2 60,10 T 95,10" stroke="var(--orange-rope)" stroke-width="3" fill="none" stroke-linecap="round" />
+            <circle cx="90" cy="10" r="3" fill="var(--orange-rope)" />
+          </svg>
+        </span>
+      </div>
+
+      <!-- Definition 2 (French Memory Meaning) -->
+      <div class="dict-def" id="def-memory">
+        <span class="def-num">2.</span>
+        <span>French: A reminder; the act of bringing something back to memory.</span>
+        <span class="flourish-memory"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- The Descent Section -->
+  <section class="descent-section container" id="features">
+    <div class="section-title-wrap">
+      <div class="hero-tag">Metaphor in Action</div>
+      <h2 class="section-title">The Descent</h2>
+      <p class="section-subtitle">
+        We track the height of your inbox cliff. As you lower down, Rappel clips you into key safety checkpoints.
+      </p>
+    </div>
+
+    <div class="descent-layout">
+      <!-- Sticky climber handle (runs directly over background continuous-rope) -->
+      <div class="rope-track-container">
+        <div class="rope-track-sticky">
+          <div class="rope-climber" id="climber-indicator">
+            <svg viewBox="0 0 24 24">
+              <path d="M7 3h10a5 5 0 0 1 5 5v8a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V8a5 5 0 0 1 5-5z" />
+              <line x1="17" y1="8" x2="13" y2="16" />
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Checklist Column -->
+      <div class="checkpoint-list">
+        
+        <!-- Checkpoint 1 (Inbox Urgency Slider) -->
+        <div class="checkpoint-card card-sway" id="cp1">
+          <div class="checkpoint-node"></div>
+          <div class="card-meta">
+            <span class="card-cp-tag">CP.01</span>
+            <span class="card-altitude">ALTITUDE: 4,200FT</span>
+          </div>
+          <h3 class="card-title">
+            <svg class="lock-indicator" viewBox="0 0 24 24">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            Urgency Triage
+          </h3>
+          <p class="card-desc">
+            Deadlines, not vibes. We filter out the chatter so you face the rock face in order. Drag the slider to watch the feed sort.
+          </p>
+          
+          <div class="checkpoint-interactive-stage">
+            <div class="triage-slider-container">
+              <div class="slider-pane pane-before">
+                <div class="email-item-mini">
+                  <span>Dave: Sync up next month?</span>
+                  <span class="mini-badge" style="background:#475569;">Feed</span>
+                </div>
+                <div class="email-item-mini">
+                  <span>Sarah: PRICING SLIDES URGENT</span>
+                  <span class="mini-badge" style="background:#475569;">Feed</span>
+                </div>
+                <div class="email-item-mini">
+                  <span>Netflix: Payment Expired</span>
+                  <span class="mini-badge" style="background:#475569;">Feed</span>
+                </div>
+              </div>
+              
+              <div class="slider-pane pane-after" id="pane-after-el">
+                <div class="email-item-mini urgent-item">
+                  <span>Sarah: PRICING SLIDES URGENT</span>
+                  <span class="mini-badge urgent">CRITICAL</span>
+                </div>
+                <div class="email-item-mini sketchy-item">
+                  <span>Netflix: Payment Expired</span>
+                  <span class="mini-badge sketchy">PHISH THREAT</span>
+                </div>
+                <div class="email-item-mini safe-item">
+                  <span>Dave: Sync up next month?</span>
+                  <span class="mini-badge safe">SAFE</span>
+                </div>
+              </div>
+
+              <div class="triage-slider-control" id="slider-bar-el">
+                <div class="triage-slider-handle">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M8 7l4-4 4 4M8 17l4 4 4-4" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </div>
+              </div>
+
+              <input type="range" class="triage-range-input" id="triage-slider-input" min="0" max="100" value="50" oninput="updateTriageSlider(this.value)">
+            </div>
+          </div>
+        </div>
+
+        <!-- Checkpoint 2 (Phishing Hotspots Game) -->
+        <div class="checkpoint-card card-sway" id="cp2">
+          <div class="checkpoint-node"></div>
+          <div class="card-meta">
+            <span class="card-cp-tag">CP.02</span>
+            <span class="card-altitude">ALTITUDE: 3,500FT</span>
+          </div>
+          <h3 class="card-title">
+            <svg class="lock-indicator" viewBox="0 0 24 24">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            Phishing Guard
+          </h3>
+          <p class="card-desc">
+            Spots phishing before you touch the rock. We cut the rope on suspect domains. Hover over the alert zones to inspect the tells.
+          </p>
+
+          <div class="checkpoint-interactive-stage">
+            <div class="phish-game-container">
+              <div class="phish-mail-header">
+                <div class="phish-line">
+                  From: <span class="hotspot">ceo@google-secure-login.xyz
+                    <span class="hotspot-tooltip">Spoofed anchor: Real mails don't originate from suspect .xyz endpoints.</span>
+                  </span>
+                </div>
+                <div class="phish-line">
+                  Subject: <span class="hotspot">URGENT WIRE TRANSACTION - DO NOT DELAY
+                    <span class="hotspot-tooltip">False urgency: Artificial tension designed to force a slip.</span>
+                  </span>
+                </div>
+              </div>
+              <div class="phish-body">
+                Hey, I am locked in a client meeting. Access our wire gate to transfer $5,000 immediately: 
+                <span class="hotspot">http://secure-wire-tether-gate.ru/pay
+                  <span class="hotspot-tooltip">Frayed link: Redirects to an external domain (.ru) away from the bank.</span>
+                </span>.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Checkpoint 3 (Autopilot Autocomplete Drafts) -->
+        <div class="checkpoint-card card-sway" id="cp3">
+          <div class="checkpoint-node"></div>
+          <div class="card-meta">
+            <span class="card-cp-tag">CP.03</span>
+            <span class="card-altitude">ALTITUDE: 2,800FT</span>
+          </div>
+          <h3 class="card-title">
+            <svg class="lock-indicator" viewBox="0 0 24 24">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            Autopilot Drafts
+          </h3>
+          <p class="card-desc">
+            Drafted in 1.4s. Check the knot and hit send. Watch the AI compose a draft response in real-time below.
+          </p>
+
+          <div class="checkpoint-interactive-stage">
+            <div class="compose-stage">
+              <div class="compose-subject">Subject: Re: Syncing marketing slides next Tuesday</div>
+              <div class="compose-textarea-sim"><span id="typewriter-text"></span><span class="cursor-caret"></span></div>
+              
+              <div class="compose-footer">
+                <span class="draft-meta" id="draft-completion-meta">Drafted in 1.4s ✓</span>
+                <button class="replay-draft-btn" onclick="triggerTypewriterDraft()">Draft Reply</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Checkpoint 4 (Notes Compressor) -->
+        <div class="checkpoint-card card-sway" id="cp4">
+          <div class="checkpoint-node"></div>
+          <div class="card-meta">
+            <span class="card-cp-tag">CP.04</span>
+            <span class="card-altitude">ALTITUDE: 2,100FT</span>
+          </div>
+          <h3 class="card-title">
+            <svg class="lock-indicator" viewBox="0 0 24 24">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            Meeting Summaries
+          </h3>
+          <p class="card-desc">
+            Collapses transcripts into solid decisions. No scrolling through 40 minutes of hot air. Click the compressor node to squeeze the transcript.
+          </p>
+
+          <div class="checkpoint-interactive-stage">
+            <div class="compressor-grid">
+              <div class="raw-notes-pane" id="compress-raw-pane">
+                <strong>Raw transcript:</strong><br>
+                10:02 AM - Dave: "Let's align on next Monday's launch..."<br>
+                10:03 AM - Sarah: "Wait, John must test staging before we trigger anything."<br>
+                10:04 AM - John: "I can verify staging on Thursday."<br>
+                10:05 AM - Sarah: "Perfect, then I will finish the documentation by Friday."
+              </div>
+
+              <button class="compressor-center-btn" onclick="runNotesCompression()" aria-label="Compress notes">
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 4v16m0 0l-4-4m4 4l4-4" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+
+              <div class="summary-pane" id="compress-summary-pane">
+                <div class="summary-item-card">
+                  <span style="color:var(--orange-rope);">✓</span>
+                  <span>Monday launch confirmed</span>
+                </div>
+                <div class="summary-item-card">
+                  <span style="color:var(--orange-rope);">✓</span>
+                  <span>John: Test staging (Thurs)</span>
+                </div>
+                <div class="summary-item-card">
+                  <span style="color:var(--orange-rope);">✓</span>
+                  <span>Sarah: File docs (Fri)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Checkpoint 5 (Calendar Event Flip Card) -->
+        <div class="checkpoint-card card-sway" id="cp5" style="border-width: 2px;">
+          <div class="checkpoint-node"></div>
+          <div class="card-meta">
+            <span class="card-cp-tag" style="background:rgba(6,182,212,0.15); color:var(--blue-glacier);">CP.05</span>
+            <span class="card-altitude">ALTITUDE: 1,400FT</span>
+          </div>
+          <h3 class="card-title">
+            <svg class="lock-indicator" viewBox="0 0 24 24">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            Pre-Meeting Briefs
+          </h3>
+          <p class="card-desc">
+            Rappel remembers what your rope forgets. The critical email you missed, flashed right before the meeting. Hover over the calendar block to flip.
+          </p>
+
+          <div class="cp5-wrapper">
+            <div class="calendar-flip-card">
+              <div class="flip-card-inner">
+                <div class="flip-card-front">
+                  <div>
+                    <span class="cal-badge-alert">UPCOMING MEETING</span>
+                    <h4 class="cal-title" style="margin-top:12px;">Q3 Marketing Budget Sync</h4>
+                    <div class="cal-meta-line">Time: Today, 2:00 PM (15m remaining)</div>
+                    <div class="cal-meta-line">Attendees: Dave, Sarah, John, You</div>
+                  </div>
+                  <div class="flip-instruction">Hover to reveal brief ➔</div>
+                </div>
+
+                <div class="flip-card-back">
+                  <div>
+                    <h4 class="brief-sticky-title">Rappel Recall Briefing</h4>
+                    <p class="brief-sticky-content">
+                      "Dave sent an email on Tuesday at 4:15 PM stating he will reject the Q3 budget draft if server allocation exceeds $2k/mo. Verify slide 4 before starting."
+                    </p>
+                  </div>
+                  <div class="brief-sticky-footer">Sourced from mail thread #41-A</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Live Mini-Demo Section -->
+  <section class="demo-section container" id="tryit">
+    <div class="demo-grid">
+      <div class="demo-info">
+        <div class="hero-tag">Try a drop</div>
+        <h3>Triage an Email</h3>
+        <p>
+          Pick one of our test emails or write a custom message. Click "Drop It" to run the classification scan.
+        </p>
+
+        <div class="demo-chips">
+          <button class="chip active" onclick="loadSample('normal')">Casual Chat</button>
+          <button class="chip" onclick="loadSample('urgent')">Critical Slide</button>
+          <button class="chip" onclick="loadSample('sketchy')">Suspicious Wire</button>
+        </div>
+      </div>
+
+      <div class="demo-card card-sway">
+        <span class="textarea-label">Email Body Content</span>
+        <textarea class="demo-textarea" id="email-textarea">Hey Dave, just wanted to check if you have 15 minutes next Tuesday to chat about the marketing ideas? No rush, let me know when you're free. - Dave</textarea>
+        
+        <div class="drop-simulation-stage">
+          <div class="stage-wire"></div>
+          <div class="drop-package" id="falling-package">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+              <polyline points="22,6 12,13 2,6" />
+            </svg>
+          </div>
+          <div class="scanline" id="triage-scan"></div>
+        </div>
+
+        <button class="drop-btn" id="run-drop-btn" onclick="runEmailTriage()">
+          <span>Drop It</span>
+          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+          </svg>
+        </button>
+
+        <!-- Result Box -->
+        <div class="result-panel" id="triage-result">
+          <div class="result-header">
+            <span class="verdict-badge normal" id="verdict-badge">LOW URGENCY</span>
+            <span class="verdict-confidence" id="verdict-confidence">94% Confidence</span>
+          </div>
+          <p class="verdict-text" id="verdict-text">
+            Dave wants a casual sync. Safe to ignore until Friday afternoon.
+          </p>
+          <div class="verdict-draft" id="verdict-draft">
+            <strong>Suggested Draft:</strong> "Hey Dave, sounds good. Let's sync on Tuesday at 2 PM. [Insert Calendar Link]"
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Comparison Section -->
+  <section class="compare-section container" id="compare">
+    <div class="hero-tag">The Tally</div>
+    <h2 class="section-title">Rappel vs. Free-falling</h2>
+    <p class="section-subtitle">Why let your inbox dictate your blood pressure?</p>
+
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>Rappel vs. Free-falling</th>
+          <th>Free-falling (Standard Inbox)</th>
+          <th>Safety Anchor (Rappel)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="compare-feature">Inbox Clutter</td>
+          <td class="compare-freefall">
+            <div class="comparison-highlight">
+              <svg class="icon-fail" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              <span>A 200-foot pile of dry leaves hiding a scorpion.</span>
+            </div>
+            Endless scrolling trying to guess what actually matters.
+          </td>
+          <td class="compare-rappel">
+            <div class="comparison-highlight">
+              <svg class="icon-pass" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+              <span>Controlled checkpoint drops</span>
+            </div>
+            We pull the 3 emails that have real deadlines. The rest wait.
+          </td>
+        </tr>
+        <tr>
+          <td class="compare-feature">Security Threats</td>
+          <td class="compare-freefall">
+            <div class="comparison-highlight">
+              <svg class="icon-fail" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              <span>Click first, cry later in a corporate security seminar.</span>
+            </div>
+            Clicking malicious links because your email doesn't check host domains.
+          </td>
+          <td class="compare-rappel">
+            <div class="comparison-highlight">
+              <svg class="icon-pass" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+              <span>Gate locked instantly</span>
+            </div>
+            Rappel cuts the rope on bad domains before you get close.
+          </td>
+        </tr>
+        <tr>
+          <td class="compare-feature">Meeting Context</td>
+          <td class="compare-freefall">
+            <div class="comparison-highlight">
+              <svg class="icon-fail" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              <span>Browser tab frenzy</span>
+            </div>
+            Opening 14 tabs in a panic while the Zoom call connects.
+          </td>
+          <td class="compare-rappel">
+            <div class="comparison-highlight">
+              <svg class="icon-pass" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+              <span>One-rope summary brief</span>
+            </div>
+            A 30-second context briefing delivered 5 minutes before the meeting.
+          </td>
+        </tr>
+        <tr>
+          <td class="compare-feature">Writing Replies</td>
+          <td class="compare-freefall">
+            <div class="comparison-highlight">
+              <svg class="icon-fail" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              <span>Blank-page paralysis</span>
+            </div>
+            Staring at a draft for 10 minutes trying to say no politely.
+          </td>
+          <td class="compare-rappel">
+            <div class="comparison-highlight">
+              <svg class="icon-pass" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+              <span>Auto-tether draft replies</span>
+            </div>
+            Draft is ready. You just check the knot and press send.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Footer CTA Section -->
+  <section class="footer-cta-section container">
+    <h2 class="footer-cta-title">Stop free-falling.</h2>
+    <p class="footer-cta-subtitle">Clip into Rappel and safely descend through your workday.</p>
+    <div class="footer-cta-wrap">
+      <button class="clip-btn install-trigger-btn">
+        <svg viewBox="0 0 24 24">
+          <path d="M8 3h8a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4z" />
+          <path d="M16 7l-4 4-4-4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Clip in
+      </button>
+      <div class="footer-toast" id="toast-notify">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span>Simulation starting... Scrolling you up to the clip station!</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container footer-layout">
+      <div>
+        <p class="footer-tagline">RAPPEL &copy; 2026. SECURE DROP ALL DAY.</p>
+        <p style="font-size: 12px; margin-top: 4px; color: var(--border-color);">This is a marketing landing simulation. No real plugin is installed.</p>
+      </div>
+      <div class="footer-links">
+        <a href="#features" class="footer-link">Safety Anchors</a>
+        <a href="#tryit" class="footer-link">Triage Demo</a>
+        <a href="#" class="footer-link" onclick="resetInstallSimulation(); alert('Simulation state has been reset.');">Reset Sim</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ----------------------------------------------------
+       JAVASCRIPT INTERACTIVE CONTROLLER
+       ---------------------------------------------------- -->
+  <script>
+    /* PRESET DATA FOR LIVE TRIAGE DEMO */
+    const presets = {
+      normal: {
+        text: "Hey Dave, just wanted to check if you have 15 minutes next Tuesday to chat about the marketing ideas? No rush, let me know when you're free. - Dave",
+        verdict: "Dave wants a casual sync. Safe to ignore until Friday afternoon.",
+        badge: "LOW URGENCY",
+        badgeClass: "normal",
+        confidence: "94% Confidence",
+        draft: "Suggested Draft: \"Hey Dave, sounds good. Let's sync on Tuesday at 2 PM. [Insert Calendar Link]\""
+      },
+      urgent: {
+        text: "Hey team, the client moved the pitch meeting to 1:00 PM today (in 45 minutes!). We need the final pricing slides reviewed and updated in the shared deck immediately. Please verify the numbers in slide 7 right now. - Sarah",
+        verdict: "Review Slide 7 before 1:00 PM (45m remaining). Action items assigned to you.",
+        badge: "CRITICAL ACTION",
+        badgeClass: "urgent",
+        confidence: "99% Confidence",
+        draft: "Suggested Draft: \"On it, Sarah. Just updated the pricing tables on Slide 7 and verified the margins.\""
+      },
+      sketchy: {
+        text: "Dear User, We detected unauthorized login attempts on your account. To prevent suspension, you must verify your identity immediately by clicking the link below: http://secure-login-verify-rappel-web-portal.xyz/login. Failure to update will result in permanent closure. - Support Team",
+        verdict: "Phishing threat. The link points to a suspicious external domain (.xyz). Do not click.",
+        badge: "SECURITY THREAT",
+        badgeClass: "sketchy",
+        confidence: "97% Confidence",
+        draft: "Action Locked: Links isolated. Do not click. [Delete & Report Email]"
+      }
+    };
+
+    /* ----------------------------------------------------
+       HERO SIMULATED INSTALL SEQUENCE
+       ---------------------------------------------------- */
+    const ctaClipBtn = document.getElementById('cta-clip-btn');
+    const installSimulation = document.getElementById('install-simulation');
+    const installSuccess = document.getElementById('install-success');
+
+    let installTimeouts = [];
+
+    function clearInstallTimeouts() {
+      installTimeouts.forEach(t => clearTimeout(t));
+      installTimeouts = [];
+    }
+
+    if (ctaClipBtn) {
+      ctaClipBtn.addEventListener('click', () => {
+        startInstallSimulation();
+      });
+    }
+
+    const triggerBtns = document.querySelectorAll('.install-trigger-btn');
+    triggerBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        clickClipInButton();
+      });
+    });
+
+    function clickClipInButton() {
+      const widget = document.getElementById('install-widget');
+      if (widget) {
+        widget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      resetInstallSimulation();
+      installTimeouts.push(setTimeout(() => {
+        startInstallSimulation();
+      }, 800));
+    }
+
+    function startInstallSimulation() {
+      clearInstallTimeouts();
+      resetInstallSimulation();
+
+      ctaClipBtn.style.display = 'none';
+      installSimulation.classList.add('active');
+
+      const step1 = document.getElementById('status-step-1');
+      const step2 = document.getElementById('status-step-2');
+      const step3 = document.getElementById('status-step-3');
+
+      installTimeouts.push(setTimeout(() => {
+        step1.classList.add('active');
+        installSimulation.classList.add('snapped');
+      }, 300));
+
+      installTimeouts.push(setTimeout(() => {
+        step1.classList.remove('active');
+        step1.classList.add('completed');
+        step2.classList.add('active');
+      }, 1200));
+
+      installTimeouts.push(setTimeout(() => {
+        step2.classList.remove('active');
+        step2.classList.add('completed');
+        step3.classList.add('active');
+      }, 2400));
+
+      installTimeouts.push(setTimeout(() => {
+        step3.classList.remove('active');
+        step3.classList.add('completed');
+        
+        installTimeouts.push(setTimeout(() => {
+          installSimulation.classList.remove('active');
+          installSuccess.classList.add('active');
+
+          installTimeouts.push(setTimeout(() => {
+            window.location.href = 'index2.html';
+          }, 1500));
+        }, 500));
+      }, 3400));
+    }
+
+    function resetInstallSimulation() {
+      clearInstallTimeouts();
+      
+      if (ctaClipBtn) ctaClipBtn.style.display = 'flex';
+      if (installSimulation) installSimulation.classList.remove('active', 'snapped');
+      if (installSuccess) installSuccess.classList.remove('active');
+
+      const step1 = document.getElementById('status-step-1');
+      const step2 = document.getElementById('status-step-2');
+      const step3 = document.getElementById('status-step-3');
+
+      if (step1) {
+        step1.classList.remove('active', 'completed');
+        step1.classList.add('status-step');
+      }
+      if (step2) {
+        step2.classList.remove('active', 'completed');
+        step2.classList.add('status-step');
+      }
+      if (step3) {
+        step3.classList.remove('active', 'completed');
+        step3.classList.add('status-step');
+      }
+    }
+
+    /* ----------------------------------------------------
+       THE DESCENT: SCROLL-DRIVEN TIMELINE
+       ---------------------------------------------------- */
+    const cards = document.querySelectorAll('.checkpoint-card');
+    const climber = document.getElementById('climber-indicator');
+    const stickyRope = document.querySelector('.rope-track-sticky');
+
+    const observerOptions = {
+      root: null,
+      rootMargin: '-30% 0px -40% 0px',
+      threshold: 0.15
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          cards.forEach(c => c.classList.remove('active'));
+          entry.target.classList.add('active');
+          updateClimberPosition(entry.target);
+
+          if (entry.target.id === 'cp3') {
+            triggerTypewriterDraft();
+          }
+        }
+      });
+    }, observerOptions);
+
+    cards.forEach(card => observer.observe(card));
+
+    function updateClimberPosition(activeCard) {
+      if (!climber || !stickyRope) return;
+
+      const activeId = activeCard.id;
+      const index = parseInt(activeId.replace('cp', '')) - 1; // 0 to 4
+      
+      const segmentsCount = cards.length - 1;
+      const targetPercent = (index / segmentsCount) * 100;
+      
+      climber.style.top = `calc(${targetPercent}% - ${index * 8}px)`;
+    }
+
+    /* ----------------------------------------------------
+       CHECKPOINT 1 INTERACTIVE: SLIDER CONTROLS
+       ---------------------------------------------------- */
+    function updateTriageSlider(val) {
+      const paneAfter = document.getElementById('pane-after-el');
+      const sliderBar = document.getElementById('slider-bar-el');
+      
+      paneAfter.style.clipPath = `inset(0 0 0 ${val}%)`;
+      sliderBar.style.left = `${val}%`;
+    }
+
+    /* ----------------------------------------------------
+       CHECKPOINT 3 INTERACTIVE: AUTOPILOT TYPEWRITER
+       ---------------------------------------------------- */
+    let typewriterInterval;
+    const typewriterText = "Sure thing, Dave! I will run the staging checks by Tuesday morning and send you the slides before our 2 PM sync.";
+
+    function triggerTypewriterDraft() {
+      const textContainer = document.getElementById('typewriter-text');
+      const meta = document.getElementById('draft-completion-meta');
+      
+      if (!textContainer || !meta) return;
+
+      clearInterval(typewriterInterval);
+      textContainer.innerText = "";
+      meta.classList.remove('show');
+
+      let i = 0;
+      typewriterInterval = setInterval(() => {
+        if (i < typewriterText.length) {
+          textContainer.innerText += typewriterText.charAt(i);
+          i++;
+        } else {
+          clearInterval(typewriterInterval);
+          meta.classList.add('show');
+        }
+      }, 30);
+    }
+
+    /* ----------------------------------------------------
+       CHECKPOINT 4 INTERACTIVE: NOTES COMPRESSOR
+       ---------------------------------------------------- */
+    function runNotesCompression() {
+      const rawPane = document.getElementById('compress-raw-pane');
+      const summaryPane = document.getElementById('compress-summary-pane');
+      const btn = document.querySelector('.compressor-center-btn svg');
+
+      if (!rawPane || !summaryPane) return;
+
+      if (btn) btn.style.transform = 'rotate(360deg)';
+
+      rawPane.classList.add('compressed');
+      
+      setTimeout(() => {
+        summaryPane.classList.add('active');
+      }, 300);
+    }
+
+    /* ----------------------------------------------------
+       LIVE MINI-DEMO: EMAIL TRIAGE SCANNER
+       ---------------------------------------------------- */
+    function loadSample(key) {
+      const chips = document.querySelectorAll('.chip');
+      chips.forEach(c => c.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const textarea = document.getElementById('email-textarea');
+      if (textarea && presets[key]) {
+        textarea.value = presets[key].text;
+      }
+    }
+
+    function runEmailTriage() {
+      const pkg = document.getElementById('falling-package');
+      const scan = document.getElementById('triage-scan');
+      const resultPanel = document.getElementById('triage-result');
+
+      if (pkg.classList.contains('falling')) return;
+
+      resultPanel.style.display = 'none';
+      pkg.classList.add('falling');
+
+      setTimeout(() => {
+        scan.classList.add('scanning');
+      }, 700);
+
+      setTimeout(() => {
+        pkg.classList.remove('falling');
+        scan.classList.remove('scanning');
+
+        const text = document.getElementById('email-textarea').value.toLowerCase();
+        let matchedPreset = presets.normal;
+
+        if (text.includes('critical') || text.includes('pricing') || text.includes('immediately') || text.includes('urgent') || text.includes('slide')) {
+          matchedPreset = presets.urgent;
+        } else if (text.includes('unauthorized') || text.includes('verify') || text.includes('suspension') || text.includes('.xyz') || text.includes('.ru')) {
+          matchedPreset = presets.sketchy;
+        }
+
+        const badge = document.getElementById('verdict-badge');
+        const confidence = document.getElementById('verdict-confidence');
+        const verdictText = document.getElementById('verdict-text');
+        const draft = document.getElementById('verdict-draft');
+
+        badge.className = `verdict-badge ${matchedPreset.badgeClass}`;
+        badge.innerText = matchedPreset.badge;
+        confidence.innerText = matchedPreset.confidence;
+        verdictText.innerText = matchedPreset.verdict;
+        draft.innerText = matchedPreset.draft;
+
+        resultPanel.style.display = 'flex';
+      }, 1900);
+    }
+
+    function switchMainMode(mode) {
+      localStorage.setItem('rappelMode', mode);
+      
+      const workBtn = document.getElementById("main-mode-work-btn");
+      const campusBtn = document.getElementById("main-mode-campus-btn");
+
+      if (mode === "work") {
+        workBtn.classList.add("active");
+        campusBtn.classList.remove("active");
+        
+        document.getElementById("main-hero-tag").innerText = "ALTITUDE: 5,000FT";
+        document.getElementById("main-hero-title").innerText = "Stop free-falling through your workday.";
+        document.getElementById("main-hero-subtitle").innerText = "Rappel anchors to your inbox and holds the rope so you don't have to hold it all in your head.";
+        
+        // CP.01
+        document.querySelector("#cp1 .card-altitude").innerText = "ALTITUDE: 4,200FT";
+        document.querySelector("#cp1 .card-title").innerHTML = `<svg class="lock-indicator" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg> Urgency Triage`;
+        document.querySelector("#cp1 .card-desc").innerText = "Deadlines, not vibes. We filter out the chatter so you face the rock face in order. Drag the slider to watch the feed sort.";
+        
+        // CP.02
+        document.querySelector("#cp2 .card-altitude").innerText = "ALTITUDE: 3,500FT";
+        document.querySelector("#cp2 .card-title").innerHTML = `<svg class="lock-indicator" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg> Phishing Guard`;
+        document.querySelector("#cp2 .card-desc").innerText = "Spots phishing before you touch the rock. We cut the rope on suspect domains. Hover over the alert zones to inspect the tells.";
+        
+        // CP.03
+        document.querySelector("#cp3 .card-altitude").innerText = "ALTITUDE: 2,800FT";
+        document.querySelector("#cp3 .card-title").innerHTML = `<svg class="lock-indicator" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg> Autopilot Drafts`;
+        document.querySelector("#cp3 .card-desc").innerText = "Drafted in 1.4s. Check the knot and hit send. Watch the AI compose a draft response in real-time below.";
+        
+        // CP.04
+        document.querySelector("#cp4 .card-altitude").innerText = "ALTITUDE: 2,100FT";
+        document.querySelector("#cp4 .card-title").innerHTML = `<svg class="lock-indicator" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg> Meeting Summaries`;
+        document.querySelector("#cp4 .card-desc").innerText = "Collapses transcripts into solid decisions. No scrolling through 40 minutes of hot air. Click the compressor node to squeeze the transcript.";
+        
+        // CP.05
+        document.querySelector("#cp5 .card-altitude").innerText = "ALTITUDE: 1,400FT";
+        document.querySelector("#cp5 .card-title").innerHTML = `<svg class="lock-indicator" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg> Pre-Meeting Briefs`;
+        document.querySelector("#cp5 .card-desc").innerText = "Rappel remembers what your rope forgets. The critical email you missed, flashed right before the meeting. Hover over the calendar block to flip.";
+
+      } else {
+        workBtn.classList.remove("active");
+        campusBtn.classList.add("active");
+        
+        document.getElementById("main-hero-tag").innerText = "ALTITUDE: 7,000FT";
+        document.getElementById("main-hero-title").innerText = "Stop free-falling through your semester.";
+        document.getElementById("main-hero-subtitle").innerText = "Rappel anchors to your syllabus deadlines and holds the rope so you don't drop points or miss submission dates.";
+
+        // CP.01
+        document.querySelector("#cp1 .card-altitude").innerText = "ALTITUDE: 6,200FT";
+        document.querySelector("#cp1 .card-title").innerHTML = `<svg class="lock-indicator" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg> Deadline Triage`;
+        document.querySelector("#cp1 .card-desc").innerText = "Assignment dates, not panic. We anchor your deadlines so you climb the syllabus in order. Drag the slider to watch portal alerts sort.";
+
+        // CP.02
+        document.querySelector("#cp2 .card-altitude").innerText = "ALTITUDE: 5,400FT";
+        document.querySelector("#cp2 .card-title").innerHTML = `<svg class="lock-indicator" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg> Scam Guard`;
+        document.querySelector("#cp2 .card-desc").innerText = "Spots fake internships and scholarship scams. We quarantine fake portal claims. Hover over alert zones to inspect.";
+
+        // CP.03
+        document.querySelector("#cp3 .card-altitude").innerText = "ALTITUDE: 4,600FT";
+        document.querySelector("#cp3 .card-title").innerHTML = `<svg class="lock-indicator" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg> Semester Drafts`;
+        document.querySelector("#cp3 .card-desc").innerText = "Polite request templates drafted instantly. Email your professors about missed classes or extension request alerts.";
+
+        // CP.04
+        document.querySelector("#cp4 .card-altitude").innerText = "ALTITUDE: 3,800FT";
+        document.querySelector("#cp4 .card-title").innerHTML = `<svg class="lock-indicator" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg> Study Compressor`;
+        document.querySelector("#cp4 .card-desc").innerText = "Compresses lecture audio and notes into core concepts. Clear key definitions in seconds. Click the compressor node to squeeze.";
+
+        // CP.05
+        document.querySelector("#cp5 .card-altitude").innerText = "ALTITUDE: 3,000FT";
+        document.querySelector("#cp5 .card-title").innerHTML = `<svg class="lock-indicator" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg> Class Briefs`;
+        document.querySelector("#cp5 .card-desc").innerText = "Matches syllabus guides and announcements with upcoming exam schedules. Hover over the calendar block to flip.";
+      }
+    }
+  </script>
+</body>
+</html>
